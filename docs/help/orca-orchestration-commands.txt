@@ -1,0 +1,300 @@
+===== orca orchestration run-create --help
+orca orchestration run-create
+
+Usage: orca orchestration run-create --objective <text> [--from <handle>] [--retry-request <id>] [--json] [--full]
+
+Create and bind a lightweight orchestration Run
+
+Options:
+  --help                 Show this help message
+  --json                 Emit machine-readable JSON
+  --pairing-code <code>  Run against a remote Orca server using an orca://pair?... code
+  --environment <selector> Run against a saved paired Orca server (id or name), or `local` for this machine's own Orca over ORCA_ENVIRONMENT/ORCA_PAIRING_CODE; terminal handles belong to the server that issued them
+  --objective
+  --from
+  --retry-request <id>  Reissue an earlier request by its ID; replays its result instead of repeating it
+  --full                 Print the full record Orca returned instead of the concise view
+
+Notes:
+  A Run is a namespace and home inbox. It never schedules or places workers. worker-start --spec creates one when none is bound; use run-create for Task graphs or a new goal.
+  --retry-request is only for exact recovery after an unknown mutation result.
+===== orca orchestration task-create --help
+orca orchestration task-create
+
+Usage: orca orchestration task-create (--spec <text> | --spec-file <path|->) [--task-title <text>] [--display-name <text>] [--deps <json_array>] [--parent <task_id>] [--run <run_id>] [--from <handle>] [--retry-request <id>] [--json] [--full]
+
+Create an orchestration task
+
+Options:
+  --help                 Show this help message
+  --json                 Emit machine-readable JSON
+  --pairing-code <code>  Run against a remote Orca server using an orca://pair?... code
+  --environment <selector> Run against a saved paired Orca server (id or name), or `local` for this machine's own Orca over ORCA_ENVIRONMENT/ORCA_PAIRING_CODE; terminal handles belong to the server that issued them
+  --spec
+  --spec-file <path|->  Read the spec from a file or stdin
+  --task-title <text>  Concise title for the orchestration task
+  --display-name <text> UI label shown for dispatched worker rows
+  --deps
+  --parent
+  --run
+  --from
+  --retry-request <id>  Reissue an earlier request by its ID; replays its result instead of repeating it
+  --full                 Print the full record Orca returned instead of the concise view
+===== orca orchestration worker-start --help
+orca orchestration worker-start
+
+Usage: orca orchestration worker-start (--task <task_id> | --spec <text> | --spec-file <path|->) [--keep-open] [--on <saved-environment>] [--worktree <current|selector|new-child|new-top-level>] (--agent <agent> | --terminal <handle>) [--task-title <text>] [--deps <json_array>] [--parent <task_id>] [--model <id>] [--effort <level>] [--name <name>] [--repo <selector>] [--base-branch <ref>] [--display-name <text>] [--comment <text>] [--setup <run|skip|inherit>] [--retry-of <dispatch_id>] [--timeout-ms <n>] [--run <run_id>] [--from <handle>] [--retry-request <id>] [--json] [--full]
+
+Start one supervised worker on the Run home or a connected Orca server
+
+Options:
+  --help                 Show this help message
+  --json                 Emit machine-readable JSON
+  --pairing-code <code>  Run against a remote Orca server using an orca://pair?... code
+  --environment <selector> Run against a saved paired Orca server (id or name), or `local` for this machine's own Orca over ORCA_ENVIRONMENT/ORCA_PAIRING_CODE; terminal handles belong to the server that issued them
+  --task
+  --spec
+  --spec-file <path|->  Read the spec from a file or stdin
+  --keep-open            Keep the worker open after it finishes
+  --task-title <text>    Concise title for an orchestration task
+  --deps
+  --parent
+  --on
+  --worktree <selector>  Worktree selector such as identity:<identity>, id:<repo-id>::<path>, folder:<id> (where the command takes folder workspaces), name:<displayName>, branch:<branch>, issue:<number>, path:<path>, or active/current
+  --name <name>          Name for the new worktree or automation
+  --repo <selector>      Repo selector such as id:<id>, name:<name>, or path:<path>
+  --base-branch <ref>    Base branch/ref to create the worktree from
+  --display-name <name>  Override the Orca display name
+  --comment <text>       Comment stored in Orca metadata
+  --setup run|skip|inherit Setup policy for repo-defined setup hooks
+  --agent <id>          Launch a known TUI agent in the first terminal
+  --model <id>          Provider model id for a new agent launch
+  --effort <level>      Reasoning effort for the selected model
+  --terminal <handle>  Runtime-issued terminal handle
+  --retry-of
+  --timeout-ms <ms>     Maximum wait time before timing out
+  --run
+  --from
+  --retry-request <id>  Reissue an earlier request by its ID; replays its result instead of repeating it
+  --full                 Print the full record Orca returned instead of the concise view
+
+Notes:
+  With --spec and no bound Run, a coordinator gets a new Run bound to it, named after the Task title; the receipt names the Run it created or joined.
+  Current and existing worktrees never rerun setup; a fresh agent terminal is created unless --terminal is explicit.
+  When reusing --terminal, pass --worktree for that terminal; current means the coordinator worktree.
+  Reusing a settled worker's terminal with --terminal before its autoReleaseAt cancels that automatic release; after it, the start is refused while the release runs.
+  A terminal the user kept open takes --terminal work and stays kept open.
+  --agent takes an Orca agent id enabled on the worker server, such as claude, codex, cursor, antigravity, muse, zcode, opencode, or opencode2.
+  --model supports Claude, Codex, Cursor, Antigravity, Grok, and Muse opaque provider model ids; --effort requires --model. OMP also takes its model roles and selectors (such as @worker or provider/model:level), with --effort as its thinking level. Neither can combine with --terminal. OpenCode model selection requires an existing worktree, a verified execution-host CLI, and an available model; effort is unsupported. Other agents, including zcode, launch with the model from their own config.
+  Finished workers close on their own unless started with --keep-open; a worker started in a new worktree (new-child or new-top-level) is kept open, so release it when no one will use its chat.
+  New worktrees use agent-first creation; without --setup, setup runs unless the project turns it off. Repository start-immediately runs setup beside the agent; wait-for-setup gates agent readiness and task input.
+  New worktrees without --name get the name Orca gives an unnamed workspace; the receipt names it. Servers older than this change still require --name.
+  Creation flags (--name, --repo, --base-branch, --display-name, --comment, --setup) are rejected for current/existing worktrees. Use exact --repo on the selected server; project/host convenience routing remains on worktree create.
+  How the worker runs follows the user's own setting for new agent tabs; there is no flag for it and no caller needs to ask. A dispatch the setting cannot apply to still starts, so the placement, agent, and launch options passed here are always the ones honoured.
+  Drive every worker the same way whichever way it was started: the same orchestration verbs, the same handle. Mail, dispatch, worker-show, worker-read and the whole lifecycle behave identically. The start receipt records which one ran, for operators and telemetry.
+  Not every worker has a terminal. Read output with worker-read --source auto or --source transcript, which always work; --source terminal is refused when there is none, and orca terminal verbs do not accept every worker handle. Nothing above needs you to know which kind you have — the orchestration verbs cover all of them.
+  --on selects only the worker server; the Run and this command remain on the current Orca server.
+  With --on, use an exact remote selector, new-child or new-top-level (new-child and new-top-level need a remote --repo); new-child nests the server worktree under your workspace, or starts it top-level with a warning when that server is too old to nest across machines. Remote current is invalid.
+  --retry-of needs --task naming the failed Task (--spec creates a new one) and does not inherit placement; repeat the intended --on/worktree and --agent/terminal choices.
+  --spec-file reads the spec from a file (relative to the current directory) or stdin (-) on this machine, so quotes and backticks need no shell escaping.
+  --keep-open keeps the worker open after it finishes, as worker-keep-open does right after start.
+  The call exits 0 for ready, and in the concise view for a start whose turn was not yet observed (--full exits 1 for anything but ready). Failed or outcome_unknown exits 1 and JSON includes stage/failedStage, setup, effects, residualResources, and recovery commands when needed.
+===== orca orchestration worker-show --help
+orca orchestration worker-show
+
+Usage: orca orchestration worker-show --dispatch <dispatch_id> [--json] [--full]
+
+Inspect one supervised worker Dispatch
+
+Options:
+  --help                 Show this help message
+  --json                 Emit machine-readable JSON
+  --pairing-code <code>  Run against a remote Orca server using an orca://pair?... code
+  --environment <selector> Run against a saved paired Orca server (id or name), or `local` for this machine's own Orca over ORCA_ENVIRONMENT/ORCA_PAIRING_CODE; terminal handles belong to the server that issued them
+  --dispatch
+  --full                 Print the full record Orca returned instead of the concise view
+
+Notes:
+  A Dispatch created by orchestration dispatch is shown as unsupervised and reports the exact adopted terminal when its identity is still provable.
+  observation.agentWait names a worker parked on a prompt only a human can answer, with the evidence that proved it (hook, prompt-text, or title). Null means Orca looked and found no wait. An absent field means it never looked — an older host, an unverifiable worker identity, an unreadable pane, or an agent probe that did not answer in time — and never means the worker is not waiting. A waiting worker is healthy, not failed.
+===== orca orchestration worker-read --help
+orca orchestration worker-read
+
+Usage: orca orchestration worker-read --dispatch <dispatch_id> [--source <auto|transcript|terminal>] [--cursor <cursor>] [--limit <n>] [--json] [--full]
+
+Read bounded output from one supervised worker
+
+Options:
+  --help                 Show this help message
+  --json                 Emit machine-readable JSON
+  --pairing-code <code>  Run against a remote Orca server using an orca://pair?... code
+  --environment <selector> Run against a saved paired Orca server (id or name), or `local` for this machine's own Orca over ORCA_ENVIRONMENT/ORCA_PAIRING_CODE; terminal handles belong to the server that issued them
+  --dispatch
+  --source
+  --cursor <cursor>      Opaque cursor returned by a previous worker-read page
+  --limit <n>            Maximum number of rows to return
+  --full                 Print the full record Orca returned instead of the concise view
+
+Notes:
+  The default auto source uses an exact hook-reported transcript when available and otherwise returns labeled terminal output.
+  A Dispatch created by orchestration dispatch reads from its adopted terminal with worker status unsupervised.
+  Output stays readable after the terminal is released, including an automatic release after worker_done.
+  A returned cursor is pinned to the exact source; start a fresh read if Orca reports source_changed.
+===== orca orchestration check --help
+orca orchestration check
+
+Usage: orca orchestration check [--terminal <handle>] [--run <run_id>] [--ack <delivery_id>] [--unread | --peek | --all] [--types <type,...>] [--format] [--wait] [--timeout-ms <n>] [--retry-request <id>] [--json]
+  default: return the bound Run's oldest unread FIFO batch and mark it handled.
+  --ack: optional; acknowledges a batch from an older Orca that does not mark it.
+  --peek: return only unread messages without marking them read.
+  --all: return recent messages for the handle; does not mark read.
+  --wait: block until a matching message arrives or --timeout-ms expires.
+          Emits JSON keepalive lines to stderr every 15s so the caller can
+          tell the process is alive. `_keepalive` is unrelated to heartbeat
+          messages; `_heartbeat` remains as a deprecated compatibility alias.
+          Filter with `jq "select(._keepalive|not)"` when merging streams.
+
+Check this agent's messages
+
+Options:
+  --help                 Show this help message
+  --json                 Emit machine-readable JSON
+  --pairing-code <code>  Run against a remote Orca server using an orca://pair?... code
+  --environment <selector> Run against a saved paired Orca server (id or name), or `local` for this machine's own Orca over ORCA_ENVIRONMENT/ORCA_PAIRING_CODE; terminal handles belong to the server that issued them
+  --terminal <handle>  Runtime-issued terminal handle
+  --run
+  --ack
+  --unread
+  --peek
+  --all
+  --types
+  --format <png|jpeg>    Screenshot image format
+  --wait
+  --timeout-ms <ms>     Maximum wait time before timing out
+  --retry-request <id>  Reissue an earlier request by its ID; replays its result instead of repeating it
+  --full                 Print the full record Orca returned instead of the concise view
+
+Notes:
+  On Windows PowerShell, quote comma-separated type filters, e.g. --types "worker_done,escalation".
+  --types is the wake condition for --wait; a returned Delivery is always the whole FIFO batch, so it is never filtered by type. Without --wait it has no effect on consuming checks. Only --peek and --all filter their rows.
+  --format renders the returned rows as local text only; it never writes to another terminal.
+  A consuming check marks the batch it returns as handled, so the next check returns newer mail; no --ack is needed. Several --wait calls may wait on one inbox; waiting reserves nothing, listeners woken by the same arrival get the same Delivery, and --ack of a handled Delivery is a no-op. Consuming checks belong to the agent itself. A script that only watches the inbox must use --peek (including --peek --wait) and must never --ack, or it takes mail the agent never sees. If a check response was lost, rerun it with the --retry-request it printed to get the same batch. To find mail after losing context, run orca orchestration inbox --terminal <mailbox> --limit <n> --full and name the mailbox: run:<run_id> for a coordinator's bound Run, or dispatch:<dispatch_id> for a worker, including mail it read before it bound a helper Run.
+===== orca orchestration ask --help
+orca orchestration ask
+
+Usage: orca orchestration ask (--question <text> | --resume <message_id>) [--to <run:id>] [--run <run_id>] [--options <csv>] [--wait] [--timeout-ms <n>] [--from <handle>] [--retry-request <id>] [--json] [--full]
+
+Ask the coordinator a question; Orca wakes you with the answer
+
+Options:
+  --help                 Show this help message
+  --json                 Emit machine-readable JSON
+  --pairing-code <code>  Run against a remote Orca server using an orca://pair?... code
+  --environment <selector> Run against a saved paired Orca server (id or name), or `local` for this machine's own Orca over ORCA_ENVIRONMENT/ORCA_PAIRING_CODE; terminal handles belong to the server that issued them
+  --to
+  --run
+  --question
+  --resume
+  --dispatch-capability
+  --options
+  --wait
+  --timeout-ms <ms>     Maximum wait time before timing out
+  --from
+  --retry-request <id>  Reissue an earlier request by its ID; replays its result instead of repeating it
+  --full                 Print the full record Orca returned instead of the concise view
+
+Notes:
+  From a worker, a new question goes to its coordinator and ask returns at once: end your turn, and Orca wakes you with the answer as mail. A worker that already finished waits for the answer instead. --wait and --resume block until the answer instead; --timeout-ms accepts 1 to 1800000 ms per wait (default 600000 = 10 minutes, max 30 minutes), and a timeout leaves the question pending.
+===== orca orchestration reply --help
+orca orchestration reply
+
+Usage: orca orchestration reply --id <msg_id> --body <text> [--run <run_id>] [--from <handle>] [--retry-request <id>] [--json] [--full]
+
+Reply to a message
+
+Options:
+  --help                 Show this help message
+  --json                 Emit machine-readable JSON
+  --pairing-code <code>  Run against a remote Orca server using an orca://pair?... code
+  --environment <selector> Run against a saved paired Orca server (id or name), or `local` for this machine's own Orca over ORCA_ENVIRONMENT/ORCA_PAIRING_CODE; terminal handles belong to the server that issued them
+  --id <id>             Identifier for a target item or permission
+  --body
+  --run
+  --from
+  --on
+  --retry-request <id>  Reissue an earlier request by its ID; replays its result instead of repeating it
+  --full                 Print the full record Orca returned instead of the concise view
+
+Notes:
+  A reply to mail from an agent on another server goes back to that server by itself; no flag is needed.
+===== orca orchestration gate-create --help
+orca orchestration gate-create
+
+Usage: orca orchestration gate-create --task <task_id> --question <text> [--options <json_array>] [--from <handle>] [--retry-request <id>] [--json] [--full]
+
+Create a decision gate blocking a task
+
+Options:
+  --help                 Show this help message
+  --json                 Emit machine-readable JSON
+  --pairing-code <code>  Run against a remote Orca server using an orca://pair?... code
+  --environment <selector> Run against a saved paired Orca server (id or name), or `local` for this machine's own Orca over ORCA_ENVIRONMENT/ORCA_PAIRING_CODE; terminal handles belong to the server that issued them
+  --task
+  --question
+  --options
+  --from
+  --retry-request <id>  Reissue an earlier request by its ID; replays its result instead of repeating it
+  --full                 Print the full record Orca returned instead of the concise view
+===== orca orchestration gate-resolve --help
+orca orchestration gate-resolve
+
+Usage: orca orchestration gate-resolve --id <gate_id> --resolution <text> [--from <handle>] [--retry-request <id>] [--json] [--full]
+
+Resolve a pending decision gate
+
+Options:
+  --help                 Show this help message
+  --json                 Emit machine-readable JSON
+  --pairing-code <code>  Run against a remote Orca server using an orca://pair?... code
+  --environment <selector> Run against a saved paired Orca server (id or name), or `local` for this machine's own Orca over ORCA_ENVIRONMENT/ORCA_PAIRING_CODE; terminal handles belong to the server that issued them
+  --id <id>             Identifier for a target item or permission
+  --resolution
+  --from
+  --retry-request <id>  Reissue an earlier request by its ID; replays its result instead of repeating it
+  --full                 Print the full record Orca returned instead of the concise view
+===== orca orchestration gate-list --help
+orca orchestration gate-list
+
+Usage: orca orchestration gate-list [--task <task_id>] [--status <status>] [--run <run_id>] [--from <handle>] [--json] [--full]
+
+List decision gates
+
+Options:
+  --help                 Show this help message
+  --json                 Emit machine-readable JSON
+  --pairing-code <code>  Run against a remote Orca server using an orca://pair?... code
+  --environment <selector> Run against a saved paired Orca server (id or name), or `local` for this machine's own Orca over ORCA_ENVIRONMENT/ORCA_PAIRING_CODE; terminal handles belong to the server that issued them
+  --task
+  --status
+  --run
+  --from
+  --full                 Print the full record Orca returned instead of the concise view
+
+Notes:
+  --run inspects a named Run without binding; otherwise gates are scoped to the caller.
+===== orca orchestration run-show --help
+orca orchestration run-show
+
+Usage: orca orchestration run-show --id <run_id> [--removed] [--cursor <cursor>] [--json] [--full]
+
+Show one lightweight orchestration Run
+
+Options:
+  --help                 Show this help message
+  --json                 Emit machine-readable JSON
+  --pairing-code <code>  Run against a remote Orca server using an orca://pair?... code
+  --environment <selector> Run against a saved paired Orca server (id or name), or `local` for this machine's own Orca over ORCA_ENVIRONMENT/ORCA_PAIRING_CODE; terminal handles belong to the server that issued them
+  --id <id>             Identifier for a target item or permission
+  --removed              List the Tasks, Dispatches and workers removed from this Run
+  --cursor <cursor>      Cursor printed by the previous page of removed work
+  --full                 Print the full record Orca returned instead of the concise view

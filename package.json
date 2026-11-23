@@ -1,0 +1,14 @@
+{
+  "name": "council-flow",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Staged multi-model coding workflow: blind planning (Opus, Codex, Kimi via Lyber), one implementer in a fresh worktree, read-only cross-review, a bounded fix loop, tests, and a human gate before any push.",
+  "type": "module",
+  "license": "MIT",
+  "bin": { "council-flow": "bin/council-flow.mjs" },
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "doctor": "node bin/council-flow.mjs doctor"
+  }
+}

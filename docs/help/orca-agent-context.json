@@ -1,0 +1,534 @@
+{
+ "schemaVersion": 1,
+ "note": "trimmed to the commands council-flow uses",
+ "commands": [
+  {
+   "command": "automations create",
+   "path": [
+    "automations",
+    "create"
+   ],
+   "aliases": [],
+   "argumentMode": "parsed",
+   "summary": "Create a scheduled Orca automation",
+   "usage": "orca automations create --name <name> --trigger <preset|cron|rrule> --prompt <text> --provider <agent> [--precheck <command>] [--setup run|skip] [--repo <selector>|--workspace <selector>|--project <id-or-name> [--host <host>]|--project-host-setup <id>] [--json]",
+   "flags": [
+    "help",
+    "json",
+    "pairing-code",
+    "environment",
+    "name",
+    "prompt",
+    "provider",
+    "extra-agent-args",
+    "precheck",
+    "precheck-timeout",
+    "repo",
+    "workspace",
+    "project",
+    "host",
+    "project-host-setup",
+    "source-context",
+    "workspace-mode",
+    "base-branch",
+    "setup",
+    "trigger",
+    "schedule",
+    "time",
+    "day",
+    "timezone",
+    "enabled",
+    "disabled",
+    "missed-run-grace-minutes",
+    "reuse-session",
+    "fresh-session"
+   ],
+   "positionalArgs": [],
+   "examples": [
+    "orca automations create --name \"Daily review\" --trigger daily --prompt \"Review open changes\" --provider codex",
+    "orca automations create --name \"Weekday triage\" --trigger \"0 9 * * 1-5\" --prompt \"Triage issues\" --provider claude --repo my-repo",
+    "orca automations create --name \"PR review\" --trigger hourly --precheck \"gh pr list --json number -q .[0].number\" --prompt \"Review requested PRs\" --provider codex",
+    "orca automations create --name \"Docs pass\" --trigger daily --prompt \"Tidy the docs\" --provider claude --extra-agent-args=\"--model opus --effort high --add-dir docs\""
+   ],
+   "notes": [
+    "Trigger accepts hourly, daily, weekdays, weekly, a 5-field cron expression, or an RRULE string.",
+    "When --repo is omitted, the CLI uses the enclosing Orca worktree when one can be resolved from cwd.",
+    "Use --project, or --project-host-setup, to run on a specific project host setup. --project takes the project id or the display name from `orca project list`, and --host is only needed when the project is set up on more than one host.",
+    "--host takes local, ssh:<target-id>, runtime:<environment-id>, or the bare host name `orca host list` prints for any of them.",
+    "Use --source-context with a JSON TaskSourceContext when task/provider data should come from a specific host/account; pass null on edit to clear it.",
+    "Use --workspace to run in an existing worktree. With --repo or a project target, the automation creates a new worktree per run; with no target, a local create runs in the current Orca worktree unless you pass --workspace-mode new-per-run.",
+    "Use --setup run|skip for repository setup on new-per-run automations. Explicit choices override the repository setup policy and need a host running current Orca. When omitted on create, no choice is saved; current Orca skips setup.",
+    "Use --precheck to run a command only before scheduled runs; exit code 0 continues, any other exit, error, or timeout skips the run.",
+    "Use --precheck-timeout <seconds> to set the time limit (default 60 seconds). Skips appear in Orca run history and orca automations runs --id <automation-id> as skipped_precheck.",
+    "Run now in Orca and orca automations run intentionally bypass the precheck so you can test or override the scheduled condition.",
+    "Use --reuse-session only with existing-workspace automations to submit later runs to the previous live automation session when it is still available. Use --fresh-session to disable reuse.",
+    "Use --extra-agent-args=\"--model opus --effort high\" to add arguments after the host's default agent Arguments on each fresh run. Only model, effort, and a few safe options are accepted (Antigravity, Claude, Codex, CodeBuddy, Cursor, Grok, OMP, Pi); extras cannot be combined with --reuse-session. On edit, --extra-agent-args= clears them."
+   ]
+  },
+  {
+   "command": "linear issue",
+   "path": [
+    "linear",
+    "issue"
+   ],
+   "aliases": [],
+   "argumentMode": "parsed",
+   "summary": "Read Linear issue context for agents",
+   "usage": "orca linear issue [<id>] [--current] [--comments] [--children] [--depth <n>] [--attachments] [--relations] [--activity] [--full] [--workspace <id>] [--json]",
+   "flags": [
+    "help",
+    "json",
+    "pairing-code",
+    "environment",
+    "current",
+    "comments",
+    "children",
+    "depth",
+    "attachments",
+    "relations",
+    "activity",
+    "full",
+    "workspace",
+    "id"
+   ],
+   "positionalArgs": [
+    "id"
+   ],
+   "examples": [
+    "orca linear issue ENG-123",
+    "orca linear issue --current --comments",
+    "orca linear issue https://linear.app/acme/issue/ENG-123 --full --json"
+   ],
+   "notes": []
+  },
+  {
+   "command": "orchestration ask",
+   "path": [
+    "orchestration",
+    "ask"
+   ],
+   "aliases": [],
+   "argumentMode": "parsed",
+   "summary": "Ask the coordinator a question; Orca wakes you with the answer",
+   "usage": "orca orchestration ask (--question <text> | --resume <message_id>) [--to <run:id>] [--run <run_id>] [--options <csv>] [--wait] [--timeout-ms <n>] [--from <handle>] [--retry-request <id>] [--json] [--full]",
+   "flags": [
+    "help",
+    "json",
+    "pairing-code",
+    "environment",
+    "to",
+    "run",
+    "question",
+    "resume",
+    "dispatch-capability",
+    "options",
+    "wait",
+    "timeout-ms",
+    "from",
+    "retry-request",
+    "full"
+   ],
+   "positionalArgs": [],
+   "examples": [],
+   "notes": [
+    "From a worker, a new question goes to its coordinator and ask returns at once: end your turn, and Orca wakes you with the answer as mail. A worker that already finished waits for the answer instead. --wait and --resume block until the answer instead; --timeout-ms accepts 1 to 1800000 ms per wait (default 600000 = 10 minutes, max 30 minutes), and a timeout leaves the question pending."
+   ]
+  },
+  {
+   "command": "orchestration check",
+   "path": [
+    "orchestration",
+    "check"
+   ],
+   "aliases": [],
+   "argumentMode": "parsed",
+   "summary": "Check this agent's messages",
+   "usage": "orca orchestration check [--terminal <handle>] [--run <run_id>] [--ack <delivery_id>] [--unread | --peek | --all] [--types <type,...>] [--format] [--wait] [--timeout-ms <n>] [--retry-request <id>] [--json]\n  default: return the bound Run's oldest unread FIFO batch and mark it handled.\n  --ack: optional; acknowledges a batch from an older Orca that does not mark it.\n  --peek: return only unread messages without marking them read.\n  --all: return recent messages for the handle; does not mark read.\n  --wait: block until a matching message arrives or --timeout-ms expires.\n          Emits JSON keepalive lines to stderr every 15s so the caller can\n          tell the process is alive. `_keepalive` is unrelated to heartbeat\n          messages; `_heartbeat` remains as a deprecated compatibility alias.\n          Filter with `jq \"select(._keepalive|not)\"` when merging streams.",
+   "flags": [
+    "help",
+    "json",
+    "pairing-code",
+    "environment",
+    "terminal",
+    "run",
+    "ack",
+    "unread",
+    "peek",
+    "all",
+    "types",
+    "format",
+    "wait",
+    "timeout-ms",
+    "retry-request",
+    "full"
+   ],
+   "positionalArgs": [],
+   "examples": [],
+   "notes": [
+    "On Windows PowerShell, quote comma-separated type filters, e.g. --types \"worker_done,escalation\".",
+    "--types is the wake condition for --wait; a returned Delivery is always the whole FIFO batch, so it is never filtered by type. Without --wait it has no effect on consuming checks. Only --peek and --all filter their rows.",
+    "--format renders the returned rows as local text only; it never writes to another terminal.",
+    "A consuming check marks the batch it returns as handled, so the next check returns newer mail; no --ack is needed. Several --wait calls may wait on one inbox; waiting reserves nothing, listeners woken by the same arrival get the same Delivery, and --ack of a handled Delivery is a no-op. Consuming checks belong to the agent itself. A script that only watches the inbox must use --peek (including --peek --wait) and must never --ack, or it takes mail the agent never sees. If a check response was lost, rerun it with the --retry-request it printed to get the same batch. To find mail after losing context, run orca orchestration inbox --terminal <mailbox> --limit <n> --full and name the mailbox: run:<run_id> for a coordinator's bound Run, or dispatch:<dispatch_id> for a worker, including mail it read before it bound a helper Run."
+   ]
+  },
+  {
+   "command": "orchestration gate-create",
+   "path": [
+    "orchestration",
+    "gate-create"
+   ],
+   "aliases": [],
+   "argumentMode": "parsed",
+   "summary": "Create a decision gate blocking a task",
+   "usage": "orca orchestration gate-create --task <task_id> --question <text> [--options <json_array>] [--from <handle>] [--retry-request <id>] [--json] [--full]",
+   "flags": [
+    "help",
+    "json",
+    "pairing-code",
+    "environment",
+    "task",
+    "question",
+    "options",
+    "from",
+    "retry-request",
+    "full"
+   ],
+   "positionalArgs": [],
+   "examples": [],
+   "notes": []
+  },
+  {
+   "command": "orchestration gate-list",
+   "path": [
+    "orchestration",
+    "gate-list"
+   ],
+   "aliases": [],
+   "argumentMode": "parsed",
+   "summary": "List decision gates",
+   "usage": "orca orchestration gate-list [--task <task_id>] [--status <status>] [--run <run_id>] [--from <handle>] [--json] [--full]",
+   "flags": [
+    "help",
+    "json",
+    "pairing-code",
+    "environment",
+    "task",
+    "status",
+    "run",
+    "from",
+    "full"
+   ],
+   "positionalArgs": [],
+   "examples": [],
+   "notes": [
+    "--run inspects a named Run without binding; otherwise gates are scoped to the caller."
+   ]
+  },
+  {
+   "command": "orchestration gate-resolve",
+   "path": [
+    "orchestration",
+    "gate-resolve"
+   ],
+   "aliases": [],
+   "argumentMode": "parsed",
+   "summary": "Resolve a pending decision gate",
+   "usage": "orca orchestration gate-resolve --id <gate_id> --resolution <text> [--from <handle>] [--retry-request <id>] [--json] [--full]",
+   "flags": [
+    "help",
+    "json",
+    "pairing-code",
+    "environment",
+    "id",
+    "resolution",
+    "from",
+    "retry-request",
+    "full"
+   ],
+   "positionalArgs": [],
+   "examples": [],
+   "notes": []
+  },
+  {
+   "command": "orchestration run-create",
+   "path": [
+    "orchestration",
+    "run-create"
+   ],
+   "aliases": [],
+   "argumentMode": "parsed",
+   "summary": "Create and bind a lightweight orchestration Run",
+   "usage": "orca orchestration run-create --objective <text> [--from <handle>] [--retry-request <id>] [--json] [--full]",
+   "flags": [
+    "help",
+    "json",
+    "pairing-code",
+    "environment",
+    "objective",
+    "from",
+    "retry-request",
+    "full"
+   ],
+   "positionalArgs": [],
+   "examples": [],
+   "notes": [
+    "A Run is a namespace and home inbox. It never schedules or places workers. worker-start --spec creates one when none is bound; use run-create for Task graphs or a new goal.",
+    "--retry-request is only for exact recovery after an unknown mutation result."
+   ]
+  },
+  {
+   "command": "orchestration send",
+   "path": [
+    "orchestration",
+    "send"
+   ],
+   "aliases": [],
+   "argumentMode": "parsed",
+   "summary": "Send an inter-agent message",
+   "usage": "orca orchestration send --subject <text> [--to <run:id|dispatch:id|legacy_handle>] [--on <server>] [--run <run_id>] [--from <handle>] [--body <text>] [--type <type>] [--priority <level>] [--thread-id <id>] [--payload <json>] [--task-id <id>] [--dispatch-id <id>] [--outcome <succeeded|failed>] [--files-modified <csv>] [--report-path <path>] [--phase <text>] [--retry-request <id>] [--json] [--full]",
+   "flags": [
+    "help",
+    "json",
+    "pairing-code",
+    "environment",
+    "to",
+    "on",
+    "run",
+    "from",
+    "subject",
+    "body",
+    "type",
+    "priority",
+    "thread-id",
+    "payload",
+    "task-id",
+    "dispatch-id",
+    "dispatch-capability",
+    "retry-request",
+    "outcome",
+    "files-modified",
+    "report-path",
+    "phase",
+    "full"
+   ],
+   "positionalArgs": [],
+   "examples": [],
+   "notes": [
+    "Valid --type values: status, dispatch, worker_done, merge_ready, escalation, handoff, decision_gate, question, heartbeat.",
+    "To answer a worker question, use orchestration reply --id <msg_id> --body <text> with the same Orca CLI executable.",
+    "Group addresses (@all, @idle, @codex, ...) reach the live Dispatches of your own Run; a sender in no Run must use run:<id> or dispatch:<id>. @worktree:<id> names one workspace.",
+    "Run groups exclude their owning coordinator; send to run:<id> to raise something with yours. Nested coordinators receive group mail in their child Run mailbox; @worktree:<id> includes workspace coordinators.",
+    "On Windows PowerShell, quote group addresses such as --to \"@all\" or --to \"@worktree:<id>\".",
+    "worker_done and heartbeat are exact-Dispatch signals and cannot target groups; omit --to to use the Dispatch's Run mailbox.",
+    "worker_done requires --outcome succeeded or --outcome failed.",
+    "From a worker, an omitted recipient defaults to its coordinator, also after it finished; mail sent after finishing, worker_done included, leaves the finished task unchanged.",
+    "Use --to dispatch:<id> for attempt-specific coordinator guidance; Orca durably relays it to a connected worker server.",
+    "A worker_done with the active task/dispatch IDs completes that task only from the dispatched pane. When stable pane identity is unavailable, the sender handle must exactly match the dispatch assignee; injected preambles include the correct --from value.",
+    "Prefer --task-id/--dispatch-id/etc. over raw --payload JSON in worker commands; PowerShell strips JSON quotes easily.",
+    "--on <server> mails a terminal or chat agent on a paired server (--to term_… or orca_session_id:…). Your own Orca carries it, and replies come back to your own check. From an agent, --environment runs the command on that server and delivers no mail."
+   ]
+  },
+  {
+   "command": "orchestration task-create",
+   "path": [
+    "orchestration",
+    "task-create"
+   ],
+   "aliases": [],
+   "argumentMode": "parsed",
+   "summary": "Create an orchestration task",
+   "usage": "orca orchestration task-create (--spec <text> | --spec-file <path|->) [--task-title <text>] [--display-name <text>] [--deps <json_array>] [--parent <task_id>] [--run <run_id>] [--from <handle>] [--retry-request <id>] [--json] [--full]",
+   "flags": [
+    "help",
+    "json",
+    "pairing-code",
+    "environment",
+    "spec",
+    "spec-file",
+    "task-title",
+    "display-name",
+    "deps",
+    "parent",
+    "run",
+    "from",
+    "retry-request",
+    "full"
+   ],
+   "positionalArgs": [],
+   "examples": [],
+   "notes": []
+  },
+  {
+   "command": "orchestration worker-show",
+   "path": [
+    "orchestration",
+    "worker-show"
+   ],
+   "aliases": [],
+   "argumentMode": "parsed",
+   "summary": "Inspect one supervised worker Dispatch",
+   "usage": "orca orchestration worker-show --dispatch <dispatch_id> [--json] [--full]",
+   "flags": [
+    "help",
+    "json",
+    "pairing-code",
+    "environment",
+    "dispatch",
+    "full"
+   ],
+   "positionalArgs": [],
+   "examples": [],
+   "notes": [
+    "A Dispatch created by orchestration dispatch is shown as unsupervised and reports the exact adopted terminal when its identity is still provable.",
+    "observation.agentWait names a worker parked on a prompt only a human can answer, with the evidence that proved it (hook, prompt-text, or title). Null means Orca looked and found no wait. An absent field means it never looked — an older host, an unverifiable worker identity, an unreadable pane, or an agent probe that did not answer in time — and never means the worker is not waiting. A waiting worker is healthy, not failed."
+   ]
+  },
+  {
+   "command": "orchestration worker-start",
+   "path": [
+    "orchestration",
+    "worker-start"
+   ],
+   "aliases": [],
+   "argumentMode": "parsed",
+   "summary": "Start one supervised worker on the Run home or a connected Orca server",
+   "usage": "orca orchestration worker-start (--task <task_id> | --spec <text> | --spec-file <path|->) [--keep-open] [--on <saved-environment>] [--worktree <current|selector|new-child|new-top-level>] (--agent <agent> | --terminal <handle>) [--task-title <text>] [--deps <json_array>] [--parent <task_id>] [--model <id>] [--effort <level>] [--name <name>] [--repo <selector>] [--base-branch <ref>] [--display-name <text>] [--comment <text>] [--setup <run|skip|inherit>] [--retry-of <dispatch_id>] [--timeout-ms <n>] [--run <run_id>] [--from <handle>] [--retry-request <id>] [--json] [--full]",
+   "flags": [
+    "help",
+    "json",
+    "pairing-code",
+    "environment",
+    "task",
+    "spec",
+    "spec-file",
+    "keep-open",
+    "task-title",
+    "deps",
+    "parent",
+    "on",
+    "worktree",
+    "name",
+    "repo",
+    "base-branch",
+    "display-name",
+    "comment",
+    "setup",
+    "agent",
+    "model",
+    "effort",
+    "terminal",
+    "retry-of",
+    "timeout-ms",
+    "run",
+    "from",
+    "retry-request",
+    "full"
+   ],
+   "positionalArgs": [],
+   "examples": [],
+   "notes": [
+    "With --spec and no bound Run, a coordinator gets a new Run bound to it, named after the Task title; the receipt names the Run it created or joined.",
+    "Current and existing worktrees never rerun setup; a fresh agent terminal is created unless --terminal is explicit.",
+    "When reusing --terminal, pass --worktree for that terminal; current means the coordinator worktree.",
+    "Reusing a settled worker's terminal with --terminal before its autoReleaseAt cancels that automatic release; after it, the start is refused while the release runs.",
+    "A terminal the user kept open takes --terminal work and stays kept open.",
+    "--agent takes an Orca agent id enabled on the worker server, such as claude, codex, cursor, antigravity, muse, zcode, opencode, or opencode2.",
+    "--model supports Claude, Codex, Cursor, Antigravity, Grok, and Muse opaque provider model ids; --effort requires --model. OMP also takes its model roles and selectors (such as @worker or provider/model:level), with --effort as its thinking level. Neither can combine with --terminal. OpenCode model selection requires an existing worktree, a verified execution-host CLI, and an available model; effort is unsupported. Other agents, including zcode, launch with the model from their own config.",
+    "Finished workers close on their own unless started with --keep-open; a worker started in a new worktree (new-child or new-top-level) is kept open, so release it when no one will use its chat.",
+    "New worktrees use agent-first creation; without --setup, setup runs unless the project turns it off. Repository start-immediately runs setup beside the agent; wait-for-setup gates agent readiness and task input.",
+    "New worktrees without --name get the name Orca gives an unnamed workspace; the receipt names it. Servers older than this change still require --name.",
+    "Creation flags (--name, --repo, --base-branch, --display-name, --comment, --setup) are rejected for current/existing worktrees. Use exact --repo on the selected server; project/host convenience routing remains on worktree create.",
+    "How the worker runs follows the user's own setting for new agent tabs; there is no flag for it and no caller needs to ask. A dispatch the setting cannot apply to still starts, so the placement, agent, and launch options passed here are always the ones honoured.",
+    "Drive every worker the same way whichever way it was started: the same orchestration verbs, the same handle. Mail, dispatch, worker-show, worker-read and the whole lifecycle behave identically. The start receipt records which one ran, for operators and telemetry.",
+    "Not every worker has a terminal. Read output with worker-read --source auto or --source transcript, which always work; --source terminal is refused when there is none, and orca terminal verbs do not accept every worker handle. Nothing above needs you to know which kind you have — the orchestration verbs cover all of them.",
+    "--on selects only the worker server; the Run and this command remain on the current Orca server.",
+    "With --on, use an exact remote selector, new-child or new-top-level (new-child and new-top-level need a remote --repo); new-child nests the server worktree under your workspace, or starts it top-level with a warning when that server is too old to nest across machines. Remote current is invalid.",
+    "--retry-of needs --task naming the failed Task (--spec creates a new one) and does not inherit placement; repeat the intended --on/worktree and --agent/terminal choices.",
+    "--spec-file reads the spec from a file (relative to the current directory) or stdin (-) on this machine, so quotes and backticks need no shell escaping.",
+    "--keep-open keeps the worker open after it finishes, as worker-keep-open does right after start.",
+    "The call exits 0 for ready, and in the concise view for a start whose turn was not yet observed (--full exits 1 for anything but ready). Failed or outcome_unknown exits 1 and JSON includes stage/failedStage, setup, effects, residualResources, and recovery commands when needed."
+   ]
+  },
+  {
+   "command": "status",
+   "path": [
+    "status"
+   ],
+   "aliases": [],
+   "argumentMode": "parsed",
+   "summary": "Show app/runtime/graph readiness",
+   "usage": "orca status [--json]",
+   "flags": [
+    "help",
+    "json",
+    "pairing-code",
+    "environment"
+   ],
+   "positionalArgs": [],
+   "examples": [
+    "orca status",
+    "orca status --json"
+   ],
+   "notes": [
+    "caller.orcaSessionId is this agent's Orca session ID, as Orca resolved it, when the agent runs as an Orca session; otherwise caller is omitted."
+   ]
+  },
+  {
+   "command": "terminal create",
+   "path": [
+    "terminal",
+    "create"
+   ],
+   "aliases": [],
+   "argumentMode": "parsed",
+   "summary": "Create a terminal session in the current worktree",
+   "usage": "orca terminal create [--worktree <selector>] [--title <name>] [--command <text>] [--shell <shell>] [--focus] [--json]",
+   "flags": [
+    "help",
+    "json",
+    "pairing-code",
+    "environment",
+    "worktree",
+    "command",
+    "shell",
+    "title",
+    "focus"
+   ],
+   "positionalArgs": [],
+   "examples": [
+    "orca terminal create --json",
+    "orca terminal create --worktree active --command \"pnpm dev\" --json",
+    "orca terminal create --worktree path:/projects/myapp --title \"RUNNER\" --command \"npm test\"",
+    "orca terminal create --worktree path:/projects/myapp --command \"pnpm dev\" --focus",
+    "orca terminal create --worktree path:C:/src/app --shell cmd.exe --json"
+   ],
+   "notes": [
+    "Creates a visible terminal tab without switching focus when possible; falls back to a background handle if the UI cannot adopt it. Pass --focus to switch to it.",
+    "This creates a terminal and runs --command in it. To start an agent, use `orca agent launch` (or `orca worktree create --agent` for a new checkout), which follows your Chat | CLI choice.",
+    "--shell picks the shell the terminal IS on a Windows host (cmd.exe, powershell.exe, pwsh.exe, wsl.exe, bash.exe, git-bash); --command is typed into whatever shell the host started, so `--command cmd.exe` leaves a cmd running INSIDE the default shell and exiting it drops back to that shell.",
+    "A host that cannot apply --shell refuses the create rather than quietly spawning its default shell: macOS and Linux execution hosts spawn the login shell, terminals routed over SSH resolve their shell on the SSH host, a --shell that contradicts the project execution runtime (WSL vs Windows host) is refused, and an Orca host older than --shell is refused by the CLI."
+   ]
+  },
+  {
+   "command": "worktree show",
+   "path": [
+    "worktree",
+    "show"
+   ],
+   "aliases": [],
+   "argumentMode": "parsed",
+   "summary": "Show one worktree",
+   "usage": "orca worktree show --worktree <selector> [--json]",
+   "flags": [
+    "help",
+    "json",
+    "pairing-code",
+    "environment",
+    "worktree"
+   ],
+   "positionalArgs": [],
+   "examples": [],
+   "notes": []
+  }
+ ]
+}

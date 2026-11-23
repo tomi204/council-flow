@@ -1,0 +1,62 @@
+{
+  "manifestVersion": 2,
+  "id": "council-flow",
+  "name": "Council Flow",
+  "version": "0.1.0",
+  "description": "Start council-flow coding runs and local-only security audits in a new Orca terminal, and browse their .council-flow run artifacts.",
+  "author": {
+    "name": "tomi204"
+  },
+  "repository": "https://github.com/tomi204/council-flow",
+  "license": "MIT",
+  "engines": {
+    "orca": ">=1.4.248"
+  },
+  "execution": "trusted-worker",
+  "pluginApi": 1,
+  "main": "plugin/src/worker.ts",
+  "contributes": {
+    "panels": [
+      {
+        "id": "council-flow",
+        "title": "Council Flow",
+        "icon": "bot",
+        "entry": "plugin/src/panel.tsx",
+        "ui": "components"
+      }
+    ],
+    "commands": [
+      {
+        "id": "council-flow.audit",
+        "title": "Council Flow: Start audit with this workspace's last settings",
+        "when": "workspace"
+      },
+      {
+        "id": "council-flow.code",
+        "title": "Council Flow: Start coding run with this workspace's last settings",
+        "when": "workspace"
+      },
+      {
+        "id": "council-flow.resume",
+        "title": "Council Flow: Resume the latest interrupted run",
+        "when": "workspace"
+      },
+      {
+        "id": "council-flow.doctor",
+        "title": "Council Flow: Run doctor in a new terminal",
+        "when": "workspace"
+      }
+    ]
+  },
+  "capabilities": [
+    {
+      "kind": "workspace:read"
+    },
+    {
+      "kind": "terminal:send"
+    },
+    {
+      "kind": "storage:own"
+    }
+  ]
+}
