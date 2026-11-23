@@ -261,27 +261,87 @@ only run against the fake Orca CLI (see Known limitations).
 
 ## Orca plugin
 
-council-flow is also an Orca plugin: **Council Flow**, a panel in Orca's right sidebar plus four command-palette
-commands. The manifest is `orca-plugin.json` at the repository root (Orca's Git installs read it there) and the code
-is in `plugin/`. Plugin key: `local.council-flow` for a dev load or folder install, `tomi204.council-flow` when
-installed from GitHub.
+council-flow is also an Orca plugin: **Council Flow**, a panel in Orca's right sidebar, a status bar item and five
+command-palette commands. The manifest is `orca-plugin.json` at the repository root (Orca's Git installs read it
+there) and the code is in `plugin/`. Plugin key: `local.council-flow` for a dev load or folder install,
+`tomi204.council-flow` when installed from GitHub.
 
-The plugin does not reimplement anything. Each action opens **one new Orca terminal** in the chosen workspace
+The plugin does not reimplement anything. **Run** opens **one new Orca terminal** in the chosen workspace
 (`terminal.create`) running `node <checkout>/bin/council-flow.mjs …`. Because it is an Orca terminal,
 `ORCA_TERMINAL_HANDLE` is set inside it. Coding runs therefore get Orca orchestration and the Orca decision gate.
-Audits keep their terminal gate (see `audit` above). After opening the terminal the plugin never types into it again.
+Audits keep their terminal gate (see `audit` above). The plugin never types into a terminal.
+
+### Use it
+
+Open it from the Council Flow icon in the right sidebar, or with `orca plugin open local.council-flow` (or
+`tomi204.council-flow`). `plugin open` needs the desktop app: a windowless `orca serve` refuses it.
+
+1. **Say what the council should do** in the one prompt box, for example "Review authorization in the request
+   handler", and press **Run**. That is all a first run needs.
+2. **Audit | Code** is picked from your words: review, audit, inspect, find or any security language means *audit*;
+   add, implement, build, fix, refactor or write means *code*; anything unclear is *audit*. Click the other one to
+   override it. Your pick holds until the prompt reads as the other mode, or you pick again.
+3. **Dry run** is on until you turn it off: fake members and a fake gate that says no, so no tokens are spent. Turn
+   it off for a real run.
+4. **Repo** is the focused Orca workspace when it is a local Git checkout; the dropdown picks another one.
+5. **Options** (closed by default): audit target (blank = the whole repository, a path in it, or
+   `localhost`/`127.x.x.x`/`[::1]` with a port), test target, iterations, refresh context; for code, the implementer
+   and fix rounds; a repository folder; and the exact command Run will start.
+
+**Workflows** below lists the runs: waiting for approve first, then running ones, then recent finished ones, from this
+repository and the others the plugin started runs in. Each card shows the prompt, repository, mode, status (Running,
+Waiting for approve, Done, Failed, Interrupted), elapsed time, findings, and where the run is. For an audit that is
+the loop `context → red & blue → Codex review → re-context → …` with *iteration N/M*; for code,
+`plan → implement → review → fix → tests → approve`. All of it is read from the run's own `run.json`, its lock and
+the times `summary.md` and `gate.json` were written; the plugin keeps no state machine of its own.
+
+- **Waiting for approve** is a yellow card with a bell, and the status bar says "Council Flow: waiting for approve".
+  **Jump to terminal** shows the run's terminal, where you type `approve` yourself (a coding run's gate can also be
+  in Orca). The plugin never types, pastes or sends `approve` or any other answer.
+- **Open terminal** shows a run's terminal; **Summary** and **Findings** open `summary.md` and `findings.md` in the
+  panel (scrubbed again, first 256 KiB, paged); **Resume** (interrupted or failed runs) opens a new terminal with the
+  run's own subcommand and dry-run setting.
+- **The gear** opens Setup: which council-flow runs (the checkout the plugin was loaded from, or a folder you set),
+  **Run doctor** in a new terminal, and what this Orca allows.
+
+The list stays current without polling the panel: the worker watches `.council-flow/` and each live run folder with
+`fs.watch` and tells the panel when one changes; the panel also re-reads on Orca's `workspace.changed` (a terminal
+opened, closed or renamed). Because the plugin has a status bar item, Orca keeps its worker running; while a run is
+live it re-checks every 15 seconds, to notice a council-flow process that ended without writing anything (for example
+a closed terminal).
+
+| Palette command | What it does |
+|---|---|
+| Council Flow: Run this workspace's last audit prompt again | repeats the last audit started from the panel for the focused repository |
+| Council Flow: Run this workspace's last coding prompt again | the same for a coding run |
+| Council Flow: Resume the latest interrupted run | resumes the newest interrupted or failed run of the focused repository |
+| Council Flow: Show the terminal of the run waiting for approve | the same as Jump to terminal; also what the status bar item does |
+| Council Flow: Run doctor in a new terminal | `council-flow doctor --repo <workspace>` |
+
+The commands a terminal runs (`run` is the CLI's explicit name for the coding pipeline; `--` stops a prompt from
+being read as an option; the plugin picks the run id, in council-flow's format, so the panel can find the run):
+
+```text
+node <checkout>/bin/council-flow.mjs audit --repo <repo> [--target …] [--test-target …] [--rounds N] [--refresh-context] [--dry-run] --run-id <id> -- '<prompt>'
+node <checkout>/bin/council-flow.mjs run --repo <repo> [--implementer codex|claude] [--rounds N] [--dry-run] --run-id <id> -- '<prompt>'
+node <checkout>/bin/council-flow.mjs audit --repo <repo> --resume <id> [--refresh-context] [--dry-run]
+node <checkout>/bin/council-flow.mjs --resume <id> --repo <repo> [--dry-run]
+node <checkout>/bin/council-flow.mjs doctor --repo <repo>
+```
 
 ### Access it asks for
 
 | Grant | Used for |
 |---|---|
-| `trusted-worker` (execution) | `plugin/src/worker.ts` runs in a Node process on the Orca host: it reads `.council-flow/` run folders (read-only) and builds the command line |
-| `workspace:read` | list workspaces, so the repository defaults to the focused Git workspace |
+| `trusted-worker` (execution) | `plugin/src/worker.ts` runs in a Node process on the Orca host: it reads `.council-flow/` run folders (read-only, watched with `fs.watch`) and builds the command line |
+| `workspace:read` | list workspaces (the repository defaults to the focused Git workspace) and their terminals (is a run's terminal still open?) |
+| `workspace:write` | `terminal.focus` only: **Open terminal** / **Jump to terminal** show a terminal the plugin opened. Orca's wording for this capability also covers opening and renaming workspaces, opening files and running built-in commands. The plugin does none of that, and the tests check it |
 | `terminal:send` | `terminal.create` only: one new terminal per run. Orca's wording for this capability also covers typing into terminals. The plugin never does that (no `terminal.sendText`), and the tests check it |
-| `storage:own` | each repository's last panel settings (for the palette commands), the terminals it opened, an optional council-flow path |
+| `storage:own` | each repository's last prompt and options (for the palette commands), the terminals it opened, an optional council-flow path |
 
-It does not request: secrets, settings, notifications, `terminal:read`, `workspace:write`, agent, automation or
-history access. It has no hooks or event subscriptions and makes no network calls.
+It also contributes one status bar item, which keeps its worker running while the plugin is enabled. It does not
+request: secrets, settings, notifications, `terminal:read`, agent, automation or history access. It has no hooks or
+event subscriptions in the manifest and makes no network calls.
 
 ### Turn on plugins (headless `orca serve`)
 
@@ -325,66 +385,29 @@ orca plugin install <path-to-council-flow> --json
 ```
 
 Each of these first exits `3` with `approval_required`. `error.data` lists what would be granted (it must be exactly
-`trusted-worker`, `workspace:read`, `terminal:send`, `storage:own`, one panel and four commands; `orca plugin inspect
-<path-to-council-flow> --json` prints the same before you start). `error.data.command` is the same command with
-`--approve <fingerprint>`. If the list matches, re-run that command, for example:
+`trusted-worker`, `workspace:read`, `workspace:write`, `terminal:send`, `storage:own`, one panel, five commands and one
+status bar item; `orca plugin inspect <path-to-council-flow> --json` prints the same before you start).
+`error.data.command` is the same command with `--approve <fingerprint>`. If the list matches, re-run that command, for
+example:
 
 ```sh
 orca plugin install tomi204/council-flow --approve <fingerprint> --json
 orca plugin list --json            # Council Flow: running or idle
 ```
 
-The fingerprint is bound to this plugin, version, files and access. A version with new access asks again. Only use a
-fingerprint Orca printed for that exact command.
-
-### Open and use it
-
-Open it from the Council Flow icon in the right sidebar, or with `orca plugin open local.council-flow` (or
-`tomi204.council-flow`). `plugin open` needs the desktop app: a windowless `orca serve` refuses it.
-
-- **Workspace / Repository**: defaults to the focused workspace when it is a local Git checkout. Folder, SSH and WSL
-  workspaces are listed but disabled. Leave Repository blank to use the workspace folder.
-- **Audit**: scope, target (blank = the repository, a path in it, or `localhost`/`127.x.x.x`/`[::1]` with a port),
-  test target, iterations, dry run (on by default) and refresh context. The exact command is shown before you start.
-  Start opens the terminal `council-flow audit <run-id>`.
-- **Code**: task, implementer, fix rounds, dry run (on by default). Start opens the terminal `council-flow <run-id>`.
-- **Runs**: the runs in `<repo>/.council-flow/`, with status taken from `run.json`'s outcome, a live run lock, or
-  `summary.md`. Select a run to see its details. `summary.md`, `findings.md` and `run.json` open inside the panel
-  (scrubbed again, first 256 KiB, paged). Resume opens a terminal with the run's own subcommand and dry-run setting;
-  audits can also refresh their context.
-- **Setup**: which council-flow runs: the checkout the plugin was loaded from, or a folder you set. **Run doctor**
-  opens `council-flow doctor` in a terminal.
-
-The terminal opens as a tab of that workspace without taking focus, so look for its title there. Answer the run there
-(or in Orca, for a coding run's gate).
-
-| Palette command (focused workspace) | What it does |
-|---|---|
-| Council Flow: Start audit with this workspace's last settings | repeats the last audit started from the panel for this repository |
-| Council Flow: Start coding run with this workspace's last settings | the same for a coding run |
-| Council Flow: Resume the latest interrupted run | resumes the newest run whose status is `interrupted` or `failed` |
-| Council Flow: Run doctor in a new terminal | `council-flow doctor --repo <workspace>` |
-
-The commands the terminal runs (`run` is the CLI's explicit name for the coding pipeline; `--` stops a scope or task
-from being read as an option; the plugin picks the run id, in council-flow's format, so the panel can find the run):
-
-```text
-node <checkout>/bin/council-flow.mjs audit --repo <repo> [--target …] [--test-target …] [--rounds N] [--refresh-context] [--dry-run] --run-id <id> -- '<scope>'
-node <checkout>/bin/council-flow.mjs run --repo <repo> [--implementer codex|claude] [--rounds N] [--dry-run] --run-id <id> -- '<task>'
-node <checkout>/bin/council-flow.mjs audit --repo <repo> --resume <id> [--refresh-context] [--dry-run]
-node <checkout>/bin/council-flow.mjs --resume <id> --repo <repo> [--dry-run]
-node <checkout>/bin/council-flow.mjs doctor --repo <repo>
-```
+The fingerprint is bound to this plugin, version, files and access. A version with new access asks again (0.2.0 added
+`workspace:write`, the status bar item and the jump command). Only use a fingerprint Orca printed for that exact
+command.
 
 ### Safety (unchanged)
 
 - **Local targets only.** `--target` is passed through, and council-flow still refuses a non-local target before any
   model call. The panel also refuses non-loopback hosts early. That check uses the CLI's own rules and is never more
   permissive (`test/plugin.test.mjs` compares the two).
-- **The gate is yours.** The plugin never types into a terminal after opening it. It never sets `COUNCIL_FAKE_GATE`
-  or any other variable, and it cannot answer an Orca gate. The command line can never contain a control character:
-  a newline would be type-ahead that a waiting gate could read as an answer, so free text is folded to one line and
-  other control characters are refused.
+- **The gate is yours.** The plugin never types into a terminal. Jump to terminal only moves focus. It never sets
+  `COUNCIL_FAKE_GATE` or any other variable, and it cannot answer an Orca gate. The command line can never contain a
+  control character: a newline would be type-ahead that a waiting gate could read as an answer, so free text is folded
+  to one line and other control characters are refused.
 - **Secrets.** The plugin reads no environment variables. `LYBER_API_KEY` stays in your shell, and council-flow
   passes it only to fx, as before. council-flow's scrubbing is unchanged, and the panel scrubs artifacts again before
   showing them.
@@ -394,10 +417,11 @@ node <checkout>/bin/council-flow.mjs doctor --repo <repo>
 ### Plugin tests
 
 ```sh
-npm test                                   # includes test/plugin.test.mjs (parser, target and scrub parity, one dry run)
+npm test                                   # includes test/plugin.test.mjs (manifest, parser, target and scrub parity, one dry run)
 orca plugin validate . --json && orca plugin check . --json
-orca plugin test plugin --json             # command builder, run reader, worker and panel
+orca plugin test plugin --json             # mode pick, progress, command builder, run reader, worker and panel
 (cd plugin && npx -p typescript@5 tsc -p .)
+orca plugin shot . --scenario waiting-approve --out waiting.png --json   # scenarios in plugin/src/panel.check.ts; needs the desktop app
 ```
 
 ## Artifacts
@@ -538,8 +562,11 @@ handling, hooks disabled, the process-group kill, the run lock, Orca mode agains
   `test/plugin.test.mjs`.
 - The plugin's terminals come from Orca's `terminal.create`, the same call `orca terminal create` makes, so they should
   carry `ORCA_TERMINAL_HANDLE` like any Orca terminal; that is not verified live. Orca shows such a terminal as a
-  background tab; with no window to adopt it, it stays a background terminal, and an audit's terminal gate then times
-  out to deny.
+  background tab (**Jump to terminal** brings it forward); with no window to adopt it, it stays a background terminal,
+  and an audit's terminal gate then times out to deny.
+- The plugin's "waiting for approve" is inferred from what council-flow writes (an audit's `summary.md` newer than
+  its tests and no newer `gate.json`; a coding run's `gate` stage with no `gate.json` yet). It is covered by tests and
+  check scenarios, not yet by a live run. The status bar item and `plugin shot` need the desktop app.
 - The repo's own test command runs with your user's privileges inside the worktree (no secrets in its env, but not
   sandboxed).
 - `-c mcp_servers={}` for Codex is defence in depth; its effect on project-level config has not been observed.

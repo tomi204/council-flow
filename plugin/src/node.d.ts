@@ -19,6 +19,12 @@ declare module 'node:fs' {
   export function openSync(path: string, flags: string): number
   export function readSync(fd: number, buffer: Uint8Array, offset: number, length: number, position: number | null): number
   export function closeSync(fd: number): void
+  export interface FSWatcher {
+    close(): void
+    on(event: 'error', listener: (error: Error) => void): this
+    unref(): this
+  }
+  export function watch(path: string, listener: (event: string, filename: string | null) => void): FSWatcher
   // tests
   export function mkdtempSync(prefix: string): string
   export function mkdirSync(path: string, options?: { recursive?: boolean }): string | undefined
@@ -50,7 +56,7 @@ declare module 'node:child_process' {
   export function spawnSync(
     command: string,
     args: readonly string[],
-    options?: { encoding?: 'utf8'; input?: string }
+    options?: { encoding?: 'utf8'; input?: string; env?: Record<string, string | undefined>; timeout?: number }
   ): { status: number | null; stdout: string; stderr: string }
 }
 

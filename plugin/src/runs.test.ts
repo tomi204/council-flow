@@ -183,3 +183,60 @@ describe('readArtifact', () => {
     assert.throws(() => readRun(root, '../x'), /invalid run id/)
   })
 })
+
+describe('progress from the run folder', () => {
+  const iso = (msAgo: number) => new Date(Date.now() - msAgo).toISOString()
+
+  test('a live audit: its stage, iteration, findings and the lock\'s start time', () => {
+    const root = repo()
+    const lockAt = iso(10 * 60_000)
+    run(root, '20261123-100000-aaaaaaaa', {
+      'run.json': {
+        version: 2, mode: 'audit', task: 'Review auth', config: { dryRun: true, rounds: 3 }, outcome: null,
+        stages: { 'context-1': { status: 'done', startedAt: iso(9 * 60_000), endedAt: iso(8 * 60_000) }, 'teams-1': { status: 'running', startedAt: iso(8 * 60_000) } },
+        auditLoop: { iterations: [{ number: 1 }], ledger: [{ id: 'F-1', status: 'open' }, { id: 'F-2', status: 'fixed' }] }
+      },
+      '.lock': JSON.stringify({ pid: process.pid, host: os.hostname(), at: lockAt })
+    })
+    const [r] = listRuns(root).runs
+    assert.equal(r.progress.phase, 'running')
+    assert.equal(r.progress.stage, 'red & blue')
+    assert.equal(r.progress.round, 'iteration 1/3')
+    assert.equal(r.progress.findings, 2)
+    assert.equal(r.progress.open, 1)
+    assert.equal(r.since, Date.parse(lockAt))
+  })
+
+  test('waiting for approve: summary.md written after the tests, gate.json not yet', () => {
+    const root = repo()
+    const dir = run(root, '20261123-100000-bbbbbbbb', {
+      'run.json': {
+        version: 2, mode: 'audit', task: 'Review auth', config: { rounds: 1 }, outcome: null,
+        stages: { 'review-1': { status: 'done', startedAt: iso(5 * 60_000), endedAt: iso(4 * 60_000) }, tests: { status: 'done', startedAt: iso(4 * 60_000), endedAt: iso(3 * 60_000) } }
+      },
+      '.lock': JSON.stringify({ pid: process.pid, host: os.hostname(), at: iso(20 * 60_000) }),
+      'summary.md': '# Local security audit\n'
+    })
+    assert.equal(readRun(root, '20261123-100000-bbbbbbbb')?.progress.phase, 'waiting-approve')
+    fs.writeFileSync(path.join(dir, 'gate.json'), '{"decision":"deny"}')
+    assert.equal(readRun(root, '20261123-100000-bbbbbbbb')?.progress.phase, 'publishing', 'answered: recording it')
+    fs.rmSync(path.join(dir, '.lock'))
+    assert.equal(readRun(root, '20261123-100000-bbbbbbbb')?.progress.phase, 'interrupted', 'the process is gone without an outcome')
+  })
+
+  test('a rewritten run.json is read again', () => {
+    const root = repo()
+    const dir = run(root, '20261123-100000-cccccccc', { 'run.json': { version: 2, task: 't', outcome: null } })
+    assert.equal(readRun(root, '20261123-100000-cccccccc')?.progress.phase, 'interrupted')
+    fs.writeFileSync(path.join(dir, 'run.json'), JSON.stringify({ version: 2, task: 't', outcome: { status: 'declined' }, padding: 'changes the size' }))
+    assert.equal(readRun(root, '20261123-100000-cccccccc')?.progress.phase, 'done')
+  })
+
+  test('limit keeps the newest run folders', () => {
+    const root = repo()
+    for (const id of ['20261120-100000-aaaaaaaa', '20261121-100000-bbbbbbbb', '20261122-100000-cccccccc']) run(root, id, { 'run.json': { version: 2, task: id } })
+    const res = listRuns(root, 2)
+    assert.deepEqual(res.runs.map((r) => r.runId).sort(), ['20261121-100000-bbbbbbbb', '20261122-100000-cccccccc'])
+    assert.equal(res.truncated, true)
+  })
+})

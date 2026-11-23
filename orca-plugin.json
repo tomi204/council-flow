@@ -2,8 +2,8 @@
   "manifestVersion": 2,
   "id": "council-flow",
   "name": "Council Flow",
-  "version": "0.1.0",
-  "description": "Start council-flow coding runs and local-only security audits in a new Orca terminal, and browse their .council-flow run artifacts.",
+  "version": "0.2.0",
+  "description": "Say what the council should do and press Run: council-flow starts a local-only audit or a coding run in a new Orca terminal, and a live Workflows list shows each run's stage, findings and when it waits for your approve.",
   "author": {
     "name": "tomi204"
   },
@@ -28,12 +28,12 @@
     "commands": [
       {
         "id": "council-flow.audit",
-        "title": "Council Flow: Start audit with this workspace's last settings",
+        "title": "Council Flow: Run this workspace's last audit prompt again",
         "when": "workspace"
       },
       {
         "id": "council-flow.code",
-        "title": "Council Flow: Start coding run with this workspace's last settings",
+        "title": "Council Flow: Run this workspace's last coding prompt again",
         "when": "workspace"
       },
       {
@@ -42,15 +42,32 @@
         "when": "workspace"
       },
       {
+        "id": "council-flow.jump",
+        "title": "Council Flow: Show the terminal of the run waiting for approve",
+        "when": "global"
+      },
+      {
         "id": "council-flow.doctor",
         "title": "Council Flow: Run doctor in a new terminal",
         "when": "workspace"
+      }
+    ],
+    "statusBarItems": [
+      {
+        "id": "council-flow-status",
+        "text": "Council Flow",
+        "icon": "bot",
+        "tooltip": "Council Flow workflows",
+        "command": "council-flow.jump"
       }
     ]
   },
   "capabilities": [
     {
       "kind": "workspace:read"
+    },
+    {
+      "kind": "workspace:write"
     },
     {
       "kind": "terminal:send"

@@ -7,6 +7,7 @@ import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import { validRunId, type Mode } from './command'
+import { progressOf, type Liveness, type Progress, type RunState } from './progress'
 import { scrubForDisplay } from './redact'
 
 export const ARTIFACT_DIR = '.council-flow'
@@ -35,6 +36,10 @@ export type RunRow = {
   running: boolean
   resumable: boolean
   files: { summary: boolean; findings: boolean; runJson: boolean }
+  /** Phase, stage, step trail and findings, derived from run.json, the lock and file times. */
+  progress: Progress
+  /** When the council-flow process working on it now took the run lock, ms; null when none does. */
+  since: number | null
 }
 
 export type RunsResult = { repo: string; runs: RunRow[]; truncated: boolean; error?: string }
@@ -51,10 +56,10 @@ const isLink = (p: string): boolean => {
 }
 
 /** A regular file directly at `p` (not a link), or null. */
-function regularFile(p: string): { size: number } | null {
+function regularFile(p: string): { size: number; mtimeMs: number } | null {
   try {
     const st = fs.lstatSync(p)
-    return st.isFile() && !st.isSymbolicLink() ? { size: st.size } : null
+    return st.isFile() && !st.isSymbolicLink() ? { size: st.size, mtimeMs: st.mtimeMs } : null
   } catch {
     return null
   }
@@ -121,13 +126,13 @@ const time = (s: unknown): number | null => {
   return Number.isFinite(t) ? t : null
 }
 
-type Lock = { state: 'none' } | { state: 'alive'; pid: number } | { state: 'stale' } | { state: 'other-host'; host: string }
+type Lock = { state: 'none' } | { state: 'alive'; pid: number; at: number | null } | { state: 'stale' } | { state: 'other-host'; host: string }
 
 // council-flow's lock file: {pid, host, at}. Alive only for a live process on this host.
 function lockState(dir: string): Lock {
   const file = path.join(dir, '.lock')
   if (!regularFile(file)) return { state: 'none' }
-  let owner: { pid?: unknown; host?: unknown } | null = null
+  let owner: { pid?: unknown; host?: unknown; at?: unknown } | null = null
   try {
     owner = JSON.parse(fs.readFileSync(file, 'utf8'))
   } catch {
@@ -135,11 +140,12 @@ function lockState(dir: string): Lock {
   }
   if (!owner || typeof owner.pid !== 'number') return { state: 'stale' }
   if (typeof owner.host === 'string' && owner.host !== os.hostname()) return { state: 'other-host', host: owner.host }
+  const at = time(owner.at)
   try {
     process.kill(owner.pid, 0)
-    return { state: 'alive', pid: owner.pid }
+    return { state: 'alive', pid: owner.pid, at }
   } catch (e) {
-    return (e as { code?: string }).code === 'EPERM' ? { state: 'alive', pid: owner.pid } : { state: 'stale' }
+    return (e as { code?: string }).code === 'EPERM' ? { state: 'alive', pid: owner.pid, at } : { state: 'stale' }
   }
 }
 
@@ -154,32 +160,45 @@ export function toneOf(status: string): Tone {
   return 'warning'
 }
 
-type State = {
-  mode?: unknown
+type State = RunState & {
   task?: unknown
   createdAt?: unknown
   updatedAt?: unknown
   outcome?: { status?: unknown; stopReason?: unknown; unresolved?: unknown } | null
-  config?: { dryRun?: unknown } | null
+  config?: { dryRun?: unknown; rounds?: unknown } | null
   targetInput?: unknown
-  auditLoop?: { stopReason?: unknown } | null
+  auditLoop?: (NonNullable<RunState['auditLoop']> & { stopReason?: unknown }) | null
+}
+
+// Parsed run.json by path, reused while its size and mtime are unchanged: the worker re-reads runs
+// each time a run folder changes.
+const parsed = new Map<string, { size: number; mtimeMs: number; state: State | null }>()
+
+function readState(file: string, info: { size: number; mtimeMs: number }): State | null {
+  const hit = parsed.get(file)
+  if (hit && hit.size === info.size && hit.mtimeMs === info.mtimeMs) return hit.state
+  let state: State | null = null
+  try {
+    const raw = readCapped(file, MAX_RUN_JSON_BYTES)
+    if (!raw.truncated) state = JSON.parse(raw.text)
+  } catch {
+    state = null
+  }
+  if (parsed.size > 500) parsed.clear()
+  parsed.set(file, { size: info.size, mtimeMs: info.mtimeMs, state })
+  return state
 }
 
 function describe(dir: string, runId: string): RunRow {
+  const summaryFile = regularFile(path.join(dir, 'summary.md'))
+  const runFile = regularFile(path.join(dir, 'run.json'))
+  const gateFile = regularFile(path.join(dir, 'gate.json'))
   const files = {
-    summary: Boolean(regularFile(path.join(dir, 'summary.md'))),
+    summary: Boolean(summaryFile),
     findings: Boolean(regularFile(path.join(dir, 'findings.md'))),
-    runJson: Boolean(regularFile(path.join(dir, 'run.json')))
+    runJson: Boolean(runFile)
   }
-  let state: State | null = null
-  if (files.runJson) {
-    try {
-      const raw = readCapped(path.join(dir, 'run.json'), MAX_RUN_JSON_BYTES)
-      if (!raw.truncated) state = JSON.parse(raw.text)
-    } catch {
-      state = null
-    }
-  }
+  const state: State | null = runFile ? readState(path.join(dir, 'run.json'), runFile) : null
   const lock = lockState(dir)
   const outcome = state && state.outcome && typeof state.outcome === 'object' ? state.outcome : null
   let status: string
@@ -203,6 +222,15 @@ function describe(dir: string, runId: string): RunRow {
   const mode: RunRow['mode'] = state ? (state.mode === 'audit' ? 'audit' : 'code') : 'unknown'
   const stop = outcome?.stopReason ?? state?.auditLoop?.stopReason
   const running = lock.state === 'alive' || lock.state === 'other-host'
+  const liveness: Liveness = lock.state
+  const progress = progressOf({
+    mode: mode === 'audit' ? 'audit' : 'code',
+    state,
+    lock: liveness,
+    lockAt: lock.state === 'alive' ? lock.at : null,
+    summaryMtime: summaryFile?.mtimeMs ?? null,
+    gateMtime: gateFile?.mtimeMs ?? null
+  })
   return {
     runId,
     mode,
@@ -218,16 +246,19 @@ function describe(dir: string, runId: string): RunRow {
     running,
     // council-flow can resume any run it has a run.json for; a live run is left alone.
     resumable: Boolean(state) && mode !== 'unknown' && !running,
-    files
+    files,
+    progress,
+    since: lock.state === 'alive' ? lock.at : null
   }
 }
 
-/** Every run folder under `<repo>/.council-flow`, newest first. */
-export function listRuns(repo: unknown): RunsResult {
+/** Every run folder under `<repo>/.council-flow` (the newest `limit` by run id), newest first. */
+export function listRuns(repo: unknown, limit: number = MAX_RUNS): RunsResult {
   const root = checkRepo(repo)
   const base = artifactBase(root)
   if (!base) return { repo: root, runs: [], truncated: false }
   const names = fs.readdirSync(base).filter((n) => validRunId(n)).sort().reverse()
+  const max = Math.max(1, Math.min(MAX_RUNS, limit))
   const runs: RunRow[] = []
   for (const name of names) {
     const dir = path.join(base, name)
@@ -239,7 +270,7 @@ export function listRuns(repo: unknown): RunsResult {
     }
     if (st.isSymbolicLink() || !st.isDirectory()) continue
     runs.push(describe(dir, name))
-    if (runs.length >= MAX_RUNS) break
+    if (runs.length >= max) break
   }
   runs.sort((a, b) => (b.updatedAt ?? b.createdAt ?? 0) - (a.updatedAt ?? a.createdAt ?? 0) || (a.runId < b.runId ? 1 : -1))
   return { repo: root, runs, truncated: names.length > runs.length }

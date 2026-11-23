@@ -22,15 +22,16 @@ const strip = Boolean(process.features?.typescript)
 const ts = strip ? { skip: false } : { skip: 'this Node cannot import TypeScript' }
 const load = async (f) => import(new URL(`../plugin/src/${f}`, import.meta.url).href)
 
-test('plugin manifest: worker, one panel, four commands and exactly three capabilities', () => {
+test('plugin manifest: worker, one panel, five commands, one status bar item and exactly four capabilities', () => {
   assert.equal(MANIFEST.id, 'council-flow')
   assert.ok(!MANIFEST.id.startsWith('orca-'))
   assert.equal(MANIFEST.publisher, undefined, 'Orca names the publisher after the repository owner')
   assert.equal(MANIFEST.execution, 'trusted-worker')
-  assert.deepEqual(MANIFEST.capabilities.map(c => c.kind).sort(), ['storage:own', 'terminal:send', 'workspace:read'])
-  assert.deepEqual(MANIFEST.contributes.commands.map(c => c.id), ['council-flow.audit', 'council-flow.code', 'council-flow.resume', 'council-flow.doctor'])
-  assert.ok(MANIFEST.contributes.commands.every(c => !c.action && c.when === 'workspace'))
-  assert.deepEqual(Object.keys(MANIFEST.contributes).sort(), ['commands', 'panels'], 'no hooks, events, settings or keybindings')
+  assert.deepEqual(MANIFEST.capabilities.map(c => c.kind).sort(), ['storage:own', 'terminal:send', 'workspace:read', 'workspace:write'])
+  assert.deepEqual(MANIFEST.contributes.commands.map(c => c.id), ['council-flow.audit', 'council-flow.code', 'council-flow.resume', 'council-flow.jump', 'council-flow.doctor'])
+  assert.ok(MANIFEST.contributes.commands.every(c => !c.action && !c.replaces), 'no built-in action is run or replaced')
+  assert.deepEqual(MANIFEST.contributes.statusBarItems.map(s => [s.id, s.command]), [['council-flow-status', 'council-flow.jump']])
+  assert.deepEqual(Object.keys(MANIFEST.contributes).sort(), ['commands', 'panels', 'statusBarItems'], 'no hooks, events, settings or keybindings')
   for (const p of [MANIFEST.main, ...MANIFEST.contributes.panels.map(p => p.entry)]) assert.ok(fs.statSync(path.join(ROOT, p)).isFile(), p)
 })
 
@@ -43,7 +44,11 @@ test('plugin sources: no environment, no secrets API, no typing into terminals, 
     assert.doesNotMatch(code, /secrets\.|'secrets:own'/, `${f} uses the secrets store`)
     assert.doesNotMatch(code, /child_process|node:net|node:http|fetch\(|XMLHttpRequest|WebSocket/, `${f} spawns or connects`)
     assert.doesNotMatch(code, /writeFileSync|appendFileSync|rmSync|renameSync|mkdirSync|unlinkSync/, `${f} writes files`)
+    // workspace:write is granted for terminal.focus (Jump to terminal) only.
+    assert.doesNotMatch(code, /'(workspace\.open|workspace\.rename|editor\.open|commands\.run|project\.setHidden|terminal\.close)'/, `${f} uses workspace:write beyond terminal.focus`)
   }
+  const focus = sources.filter(f => /'terminal\.focus'/.test(fs.readFileSync(path.join(SRC, f), 'utf8')))
+  assert.deepEqual(focus, ['worker.ts'])
 })
 
 const CLI = path.join(ROOT, 'bin', 'council-flow.mjs')
